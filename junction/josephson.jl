@@ -12,39 +12,39 @@ function junction(t, y, paramlist)
     return [dϕ, ddϕ]
 end
 
-αlist = []
-vlist = []
+αlist = 0.1:0.01:0.12
+
 tin = 0.0
-tfin = 1.5e-2
+tfin = 1.0
 h = 1e-4
 funcs = junction
 
-R = 1e-5
-C = 1e-5
+R = 1
+C = 1
 ħ = 1.0545718176461565e-34
 e = 1.602176634e-19
 Kb = 1.380649e-23
 T = 10
 ϕ₀, dϕ₀ = varlist = [0.0 0.0;]
-figure =  plot()
+figure = plot()
 
-for γ in 10:10
+for γ in 1:2:10
+    local vlist = []
     local I₁ = (e*Kb*T)*(γ/ħ)
     println("Averaging time $tin to $tfin for γ = $γ:")
-    for α in ProgressBar(0.1:0.01:1.1)
+    for α in ProgressBar(αlist)
         local Idc = α * I₁
         local paramlist = [ħ, e, Idc, C, R, I₁]
         global varlist = runge(tin, tfin, h, funcs, varlist, paramlist)
 
         local ϕ = varlist[:, 1]
         local dϕ = varlist[:, 2]
+        plot!(ϕ)
         local avgnum = round(Int, 0.1 * length(varlist[:, 1]))
         local avgvec = last(dϕ, avgnum)
         local vavg = mean(skipmissing((ħ/(2*e)).*(dϕ)))
-
-        push!(αlist, α)
         push!(vlist, vavg)
     end
     local η = vlist ./ (I₁*R)
-    plot!(η, αlist, label="γ = $γ")
+    # plot!(η, αlist, label="γ = $γ")
 end
