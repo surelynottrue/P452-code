@@ -43,10 +43,10 @@ C = 1e-5
 e = ustrip(ElementaryCharge)
 Kb = ustrip(BoltzmannConstant)
 T = 10
-ϕ₀, dϕ₀ = varlist = [0.0 0.0;]
+ϕ₀, dϕ₀ = varlist = [0.0 0.0;] 
 figure = plot()
 
-for γ in (1:1e3:6e3)
+for γ in (1:1:1)
     local vlist = []
     local I₁ = γ * (e*Kb*T/ħ)
     println("Averaging time $tin to $tfin for γ = $γ:")
@@ -57,13 +57,16 @@ for γ in (1:1e3:6e3)
 
         local ϕ = varlist[:, 1]
         local dϕ = varlist[:, 2]
+        plot!(dϕ)
         local avgnum = round(Int, 0.01 * length(varlist[:, 1]))
         local avgvec = last(dϕ, avgnum)
         local vavg = mean(skipmissing((ħ/(2*e)).*(dϕ)))
         push!(vlist, vavg)
+        break
     end
+    break
     # println(R)
     local η = vlist ./ (I₁*R)
-    plot!(η, αlist, label="γ = $γ")
+    # plot!(η, αlist, label="γ = $γ")
     global varlist = [0.0 0.0;]
 end
