@@ -25,12 +25,16 @@ function gauss_jordan(M::AbstractMatrix{Float64}, m::Vector{Float64})
 end
 
 function sub_helper(A, b, prop="forward")
-    n = size(A)[1]; x = zeros(n)
-    prop=="forward" ? rng=(1:n) : rng=reverse(1:n)
-    for i in rng
-        if (i == rng[1]) x[i] = b[i] / A[i, i]
-        elseif (prop!="forward") x[i] = (b[i] - A[i, i+1:n]' * x[i+1:n]) / A[i, i]
-        else x[i] = (b[i] - A[i, n:i-1]' * x[n:i-1]) / A[i, i] end
+    n = size(A)[1]
+    x = zeros(n)
+    if prop=="forward"
+        for i in 1:n
+            x[i] = (b[i] - A[i, 1:i-1]' * x[1:i-1]) / A[i, i]
+        end
+    else
+        for i in reverse(1:n)
+            x[i] = (b[i] - A[i, i+1:n]' * x[i+1:n]) / A[i, i]
+        end
     end
     return x
 end
@@ -40,7 +44,7 @@ LU decomposition
 """
 function lu_decom(A::AbstractMatrix{Float64}, b::Vector{Float64}, returnlu=false)
     nn = size(A)
-    L = Matrix{Float64}(I, nn)
+    L = Matrix{Float64}(LinearAlgebra.I, nn)
     U = copy(A)
     for i in 1:nn[1]
         for j in i+1:nn[2]
@@ -49,7 +53,7 @@ function lu_decom(A::AbstractMatrix{Float64}, b::Vector{Float64}, returnlu=false
         end
     end
     y = sub_helper(L, b)
-    x = sub_helper(U, y, "back")
+    x = sub_helper(U, y, "backward")
     returnlu ? (return x, L, U) : (return x)
 end
 
@@ -117,6 +121,7 @@ end
 end
 
 module Eigen
+using LinearAlgebra
 export power, jacobi
 """
 Power Method
@@ -131,9 +136,93 @@ function power(A::Matrix{Float64}, x=ones(Float64, size(A)[1], ), stop=1e-3)
     return λ, v
 end
 
+function givens(A, k, l)
+    β = (A[l, l] - A[k, k]) / (2*A[k, l])
+    t = sign(β) / (abs(β) + sqrt(β^2 + 1))
+    c = 1/sqrt(t^2+1)
+    s = c * t
+    return c, s
+end
+
 """
 Jacobi Method (with Givens rotation)
 """
-function jacobi(A)
+function jacobi(A::AbstractMatrix)
+    n = size(A)[1]
+    Id = Matrix{Float64}(I, n, n)
+    
+    for l in 1:n
+        for k in l+1:n
+            if A[l, k] == 0
+                println(k,l)
+                continue
+            end
+            s, c = givens(A, k, l)
+            S = copy(Id)
+            S[k, l] = s
+            S[l, k] = -s
+            S[k, k] = c
+            S[l, l] = c
+            A = S'*A*S
+        end
+    end
+    return A
+end
+end
+
+module Statistics
+export linear_regression, chisq
+"""
+Linear Regression
+"""
+function linear_regression(x::Vector{Float64}, y::Vector{Float64}, yerr::Vector{Float64}, errfull=false)
+    S =  sum(1 ./ (yerr.^2))
+    Sx = sum(x ./ (yerr.^2))
+    Sy = sum(y ./ (yerr.^2))
+    Sxx = sum((x.^2) ./ (yerr.^2))
+    Syy = sum((y.^2) ./ (yerr.^2))
+    Sxy = sum((x.*y) ./ (yerr.^2))
+    
+    Δ = S*Sxx - (Sx)^2
+    c = (Sxx*Sy - Sx*Sxy)/Δ
+    m = (S*Sxy - Sx*Sy)/Δ
+    yfit = c .+ m.*x
+
+    σ²c = Sxx/Δ
+    σ²m = S/Δ
+    cov = -Sx/Δ
+    r² = Sxy/(Sxx*Syy)
+
+    if errfull
+        return yfit, m, c, σ²m, σ²c, cov, r²
+    else
+        return yfit, m, c
+    end
+end
+
+"""
+Linear Chi Squared
+"""
+function chisq(yexp::Vector{Float64}, yfit::Vector{Float64}, yerr::Vector{Float64})
+    χsq = sum(((yexp - yfit).^2) ./ yerr)
+    χsqn = χsq / (size(yexp)[1]-2)
+    return χsq, χsqn
+end
+end
+
+module Fourier
+export discrete
+"""
+Discrete Fourier Transform
+"""
+function discrete(x::Vector{ComplexF64})
+    n = size(x)[1]
+    X = zeros(ComplexF64, n,)
+    for k in 0:n-1
+        for i in 0:n-1
+            X[k+1] += x[i+1] * exp(-(2π*im*i*k)/n)
+        end
+    end
+    return X
 end
 end
