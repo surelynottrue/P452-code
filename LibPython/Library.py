@@ -142,18 +142,30 @@ class Eigen:
     def __init__(self):
         pass
 
-    def power(self, A, stop=1e-3):
+    def power(self, M, stop=1e-3):
         """
         Power Method
         """
-        x =  np.ones((A.shape[1], ))
-        v = x 
-        vold = np.zeros(np.shape(x))
-        λold = 0.0; λ = -1.0
-        while abs(λ - λold) > stop:
-            vold = v; v = np.dot(A, v)
-            λold = λ; λ = np.dot(v, x)/np.dot(vold, x)
-        return λ, v / np.linalg.norm(v)
+        N = M.shape[0]
+        A = np.copy(M)
+        eiglist = []
+        veclist = []
+
+        for i in range(N):
+            x =  np.ones((N, 1))
+            v = x 
+            vold = np.zeros(N)
+            λold = 0.0; λ = -1.0
+            while abs(λ - λold) > stop:
+                vold = v; v = np.dot(A, v)
+                λold = λ; λ = np.dot(v.T, x)/np.dot(vold.T, x)
+            
+            v /= np.linalg.norm(v)
+            eiglist.append(np.sum(λ))
+            veclist.append(np.squeeze(v))
+            R = λ * np.dot(v, v.T)
+            A = A - R
+        return eiglist, veclist
 
     def givens(self, A, k, l):
         """
@@ -243,8 +255,8 @@ class Statistics:
         """
         Polynomial Fitting
         """
-        A = np.zeros(n+1, n+1)
-        a = np.zeros(n)
+        A = np.zeros((n+1, n+1))
+        a = np.zeros(n+1)
         for i in range(n+1):
             for j in range(n+1):
                 a[j] = sum((x**j * y) / yerr**2)
