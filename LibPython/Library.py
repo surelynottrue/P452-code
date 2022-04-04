@@ -4,6 +4,7 @@ As part of the Computational Physics course at NISER
 """
 # Calls numpy for basic array functionality. See julia code in ../LibJulia for a more fleshed out (mostly) dependency free code
 import numpy as np
+from sys import exit
 class MatInv:
     def __init__(self):
         pass
@@ -130,13 +131,21 @@ class MatInv:
         else:
             return x
 
-    def inverse(self, A, func):
+    def inverse(self, A, func, residue=False):
         n = A.shape[0]
         amat = np.identity(n)
+        reslist = []
         for i in range(n):
             a = amat[:, i]
-            amat[:, i] = func(A, a)
-        return amat
+            if residue:
+                amat[:, i], res = func(A, a, residue=residue)
+                reslist.append(res)
+            else:
+                amat[:, i] = func(A, a)
+        if residue:
+            return amat, reslist
+        else:
+            return amat
 
 class Eigen:
     def __init__(self):
@@ -330,4 +339,24 @@ class UnloadedMatrix:
                 dotval[i] += self.__getitem__((i, j)) * other[j]
         return dotval
 
-    
+class DiffEq:
+    def __init__(self, function, t, yinit):
+        self.func = function
+        self.h = t[1] - t[0]
+        self.t = t
+        self.l = len(yinit)
+        self.y = np.reshape(np.array(yinit), (1, self.l))
+
+    def runge_kutta(self):
+        for n in range(len(self.t)):
+            tn = self.t[-1]
+            yn = self.y[-1]
+            h = self.h
+            k1 = self.func(tn, yn)
+            k2 = self.func(tn + 0.5*h, yn + 0.5*h*k1)
+            k3 = self.func(tn + 0.5*h, yn + 0.5*h*k2)
+            k4 = self.func(tn + h, yn + h*k3)
+            ynext = np.reshape(yn + (1/6)*(k1 + 2*k2 + 2*k3 + k4), (1, self.l))
+            self.y = np.concatenate((self.y, ynext), axis=0)
+
+        return self.y
