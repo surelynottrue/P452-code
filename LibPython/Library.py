@@ -349,14 +349,14 @@ class DiffEq:
 
     def runge_kutta(self):
         for n in range(len(self.t)):
-            tn = self.t[-1]
+            tn = self.t[n]
             yn = self.y[-1]
             h = self.h
             k1 = self.func(tn, yn)
             k2 = self.func(tn + 0.5*h, yn + 0.5*h*k1)
             k3 = self.func(tn + 0.5*h, yn + 0.5*h*k2)
             k4 = self.func(tn + h, yn + h*k3)
-            ynext = np.reshape(yn + (1/6)*(k1 + 2*k2 + 2*k3 + k4), (1, self.l))
+            ynext = np.reshape(yn + (h/6)*(k1 + 2*k2 + 2*k3 + k4), (1, self.l))
             self.y = np.concatenate((self.y, ynext), axis=0)
 
         return self.y
