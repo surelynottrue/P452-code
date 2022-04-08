@@ -340,22 +340,24 @@ class UnloadedMatrix:
         return dotval
 
 class DiffEq:
-    def __init__(self, function, t, yinit):
+    def __init__(self, function, t, yinit, paramlist):
         self.func = function
         self.h = t[1] - t[0]
         self.t = t
         self.l = len(yinit)
         self.y = np.reshape(np.array(yinit), (1, self.l))
+        self.params = paramlist
 
     def runge_kutta(self):
         for n in range(len(self.t)):
             tn = self.t[n]
             yn = self.y[-1]
             h = self.h
-            k1 = self.func(tn, yn)
-            k2 = self.func(tn + 0.5*h, yn + 0.5*h*k1)
-            k3 = self.func(tn + 0.5*h, yn + 0.5*h*k2)
-            k4 = self.func(tn + h, yn + h*k3)
+            params = self.params
+            k1 = self.func(tn, yn, params)
+            k2 = self.func(tn + 0.5*h, yn + 0.5*h*k1, params)
+            k3 = self.func(tn + 0.5*h, yn + 0.5*h*k2, params)
+            k4 = self.func(tn + h, yn + h*k3, params)
             ynext = np.reshape(yn + (h/6)*(k1 + 2*k2 + 2*k3 + k4), (1, self.l))
             self.y = np.concatenate((self.y, ynext), axis=0)
 
