@@ -101,29 +101,31 @@ class MatInv:
         """
         Conjugate Gradient
         """
-        if str(type(A)) == "<class 'LibPython.Library.UnloadedMatrix'>":
-            func = A.dot
-        else:
-            func = np.dot
-        x= np.ones((A.shape[0], ))
-        d = np.copy(b - np.squeeze(func(A, x)))
-        r = np.copy(b - np.squeeze(func(A, x)))
+
+        x = np.random.random(A.shape[0])
+        d = b - A@x
+        r = np.copy(d)
         con = 0
         res = []
+
         for i in range(A.shape[0]):
-            Ad = func(A, d)
-            modr = np.linalg.norm(r)
-            α = modr / np.dot(d.T, Ad)
+            Ad = A@d
+            modr = r@r
+
+            α = (r@r) / (d@Ad)
             x += α * d
             β = 1 / modr
             r -= α * (Ad)
-            modr = np.linalg.norm(r)
-            res.append(modr)
-            if (modr < stop):
+
+            modr = r@r
+            res.append(np.sqrt(modr))
+
+            if (np.sqrt(modr) < stop):
                 break 
             β *= modr
             d = r + β * d
             con += 1
+            
         if con == A.shape[0]:
             raise Exception("Passed n loops, possibly did not converge")
         if residue:
@@ -295,20 +297,30 @@ class UnloadedMatrix:
     Requires: size, shape, args
     Returns: UnloadedMatrix
     """
-    def __init__(self, size, mu, m):
-        self.size = size
-        self.shape = (size, size)
+    def __init__(self, N, mu, m):
+        self.size = N**2
+        self.shape = (self.size, self.size)
         self.mu = mu
         self.m = m
         self.mul = 1
     
     def delta(self, i, j):
         return float(i==j)
-
+    
     def __getitem__(self, idx):
         i = idx[0]
         j = idx[1]
-        return self.mul*(0.5*(self.delta(i+self.mu, j) + self.delta(i-self.mu, j) - 2*self.delta(i, j)) + (self.m**2)*(self.delta(i, j)))
+        mu = self.mu
+        x1 = i // np.sqrt(self.shape[0])
+        x2 = i % np.sqrt(self.shape[1])
+        y1 = j // np.sqrt(self.shape[0])
+        y2 = j % np.sqrt(self.shape[1])
+
+        first = self.delta(x1 - mu[0][0], y1) * self.delta(x2 - mu[0][1], y2) + self.delta(x1 - mu[1][0], y1) * self.delta(x2 - mu[1][1], y2)
+        second = self.delta(x1 + mu[0][0], y1) * self.delta(x2 + mu[0][1], y2) + self.delta(x1 + mu[1][0], y1) * self.delta(x2 + mu[1][1], y2)
+        third = (self.m**2 - 1) * self.delta(x1, y1) * self.delta(x2, y2)
+
+        return self.mul * (0.5 * (first + second) + third)
 
     def __str__(self):
         start = "UnloadedMatrix(["
@@ -331,12 +343,26 @@ class UnloadedMatrix:
         self.mul = other
         return self
 
-    def dot(self, A, other):
-        assert(self.size == other.shape[0])
+    def __matmul__(self, other):
+        if self.shape[1] != other.shape[0]:
+            raise ValueError("Matrices not compatible")
+        
+        if len(other.shape) == 2:
+            cols = []
+            for col in other.T:
+                dotval = np.zeros_like(col)
+                for i in range(self.shape[0]):
+                    for j in range(self.shape[1]):
+                        dotval[i] += self.__getitem__((i, j)) * col[j]
+                cols.append(dotval)
+            
+            return np.c_[cols]
+
         dotval = np.zeros_like(other)
-        for i in range(self.size):
-            for j in range(self.size):
+        for i in range(self.shape[0]):
+            for j in range(self.shape[1]):
                 dotval[i] += self.__getitem__((i, j)) * other[j]
+
         return dotval
 
 class DiffEq:
@@ -362,3 +388,19 @@ class DiffEq:
             self.y = np.concatenate((self.y, ynext), axis=0)
 
         return self.y
+
+class Random:
+    def __init__(self):
+        import time
+        self.seed = time.time()
+
+    def mlcg(self, a=572, m=16381):
+        self.seed = (a * self.seed) % m
+        return self.seed / m
+
+    def normal(self, center=0.0, sigma=1.0):
+        u = [self.mlcg(), self.mlcg()]
+        u1 = (np.sqrt(-2*np.log(u[0])))*np.cos(2*np.pi*u[0])
+        u2 = (np.sqrt(-2*np.log(u[1])))*np.sin(2*np.pi*u[1])
+        u = u2
+        return sigma*u + center
