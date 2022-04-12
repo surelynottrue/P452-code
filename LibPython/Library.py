@@ -262,16 +262,34 @@ class Statistics:
         χsqn = χsq / (yexp.shape[0]-2)
         return χsq, χsqn
 
-    def polyfit(self, x, y, yerr, n=2):
+    def polynomial(self, n, x):
+        return x**n
+
+    def chebyshev(self, n, x):
+        if n == 0:
+            return 1
+        elif n == 1:
+            return (2*x - 1)
+        elif n == 2:
+            return (8*x**2 - 8*x + 1)
+        elif n == 3:
+            return (32*x**3 - 48*x**2 + 18*x - 1)
+
+    def polyfit(self, x, y, yerr, n=2, basis="polynomial"):
         """
         Polynomial Fitting
         """
+        if basis == "polynomial":
+            base = self.polynomial
+        elif basis == "chebyshev":
+            base = self.chebyshev
+
         A = np.zeros((n+1, n+1))
         a = np.zeros(n+1)
         for i in range(n+1):
             for j in range(n+1):
-                a[j] = sum((x**j * y) / yerr**2)
-                A[i, j] = np.sum(x**(i+j) / yerr**2)
+                a[j] = sum((base(j, x) * y) / yerr**2)
+                A[i, j] = np.sum(base(i, x)*base(j, x) / yerr**2)
         return MatInv().gauss_siedel(A, a)
 
 class Fourier:
