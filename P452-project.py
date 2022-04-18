@@ -2,16 +2,18 @@ import numpy as np
 from LibPython.Library import DiffEq
 from matplotlib import pyplot as plt
 
-def junction(t, y, paramlist, noisy=False, noiselevel=0.01):
+def junction(t, y, paramlist, vsave, noisy=False, noiselevel=0.01):
     I, Ic0, Q = tuple(paramlist)
     rand = np.random.normal(scale=noiselevel)
     if Q >= 1:
         dg, g = tuple(y)
         ddg = I/Ic0 - (1/Q)*dg - np.sin(g) + noisy*rand*I
+        vsave.append(dg)
         return np.array([ddg, dg])
     else:
         g = y
         dg = Q*(I/Ic0 - np.sin(g) + noisy*rand*I)
+        vsave.append(dg)
         return np.array(dg)
 
 start, stop = 0.75, 1.5
@@ -23,7 +25,6 @@ for Q in [1, 1e-2]:
     if Q == 1: noiselist = [0.00, 0.01, 0.05]
     for noise in noiselist:
         Ic0 = 1.0
-        Q = 1e-2
         tend = numpoints = 1e3
         if Q<1: tend = 1/Q**2
         tlist = np.linspace(0, tend, int(numpoints))
@@ -33,14 +34,12 @@ for Q in [1, 1e-2]:
         for alp in cycle:
             I = Ic0*alp
             paramlist = [I, Ic0, Q]
-            d = DiffEq(lambda t, y, p : junction(t, y, p, noisy=bool(noise), noiselevel=noise), tlist, list(start), paramlist)
+            vtau = []
+            d = DiffEq(lambda t, y, p : junction(t, y, p, vsave=vtau, noisy=bool(noise), noiselevel=noise), tlist, list(start), paramlist)
             y = d.runge_kutta()
 
             start = y[-1]
-            if (Q<1):
-                v = np.average(junction(tlist, y[:, 0], paramlist))
-            else:
-                v = np.average(y[:, 0])
+            v = np.average(vtau)
             vlist.append(v)
             ilist.append(I)
             try:
@@ -54,5 +53,5 @@ for Q in [1, 1e-2]:
     plt.xlabel("I/Ic0")
     plt.ylabel("V/R*Ic0")
     plt.legend()
-    plt.savefig(f"Q_{Q}")
-    plt.clear()
+    plt.savefig(f"Q_{Q}.png")
+    plt.clf()
