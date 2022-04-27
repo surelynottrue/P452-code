@@ -392,6 +392,31 @@ class DiffEq:
         self.y = np.reshape(np.array(yinit), (1, self.l))
         self.params = paramlist
 
+    def forward_euler(self):
+        for n in range(len(self.t)):
+            tn = self.t[n]
+            yn = self.y[-1]
+            h = self.h
+            params = self.params
+            yfin = yn + h*(self.func(tn, yn, params))
+            ynext = np.reshape(yfin, (1, self.l))
+            self.y = np.concatenate((self.y, ynext), axis=0)
+
+        return self.y
+
+    def predictor_corrector(self):
+        for n in range(len(self.t)):
+            tn = self.t[n]
+            yn = self.y[-1]
+            h = self.h
+            params = self.params
+            guess = yn + h*(self.func(tn, yn, params))
+            yfin = yn + 0.5*h*(self.func(tn, yn, params) + self.func(tn+h, guess, params))
+            ynext = np.reshape(yfin, (1, self.l))
+            self.y = np.concatenate((self.y, ynext), axis=0)
+
+        return self.y
+
     def runge_kutta(self):
         for n in range(len(self.t)):
             tn = self.t[n]
