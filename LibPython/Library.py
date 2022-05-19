@@ -57,6 +57,30 @@ class MatInv:
         else:
             return x
 
+    def chol_decom(self, A, b, returnch=False):
+        """
+        Cholesky decomposition
+        """
+        nn = A.shape
+        L = np.identity(nn[0])
+        for i in range(nn[0]):
+            for j in range(i+1):
+                a = 0
+                for k in range(j):
+                    a += L[i, k] * L[j, k]
+
+                if (i == j):
+                    L[i, j] = np.sqrt(A[i, i] - a)
+                else:
+                    L[i, j] = (1.0 / L[j, j] * (A[i, j] - a))
+
+        y = self.sub_helper(L, b)
+        x = self.sub_helper(L.T, y, "backward")
+        if returnch:
+            return x, L, L.T
+        else:
+            return x
+
     def jacobi(self, A, b, stop=1e-9, residue=False):
         """
         Jacobi Iteration
@@ -274,6 +298,24 @@ class Statistics:
             return (8*x**2 - 8*x + 1)
         elif n == 3:
             return (32*x**3 - 48*x**2 + 18*x - 1)
+        elif n == 4:
+            return (128*x**4 - 256*x**3 + 160*x**2 - 32*x + 1)
+
+    def legendre(self, n, x):
+        if n == 0:
+            return 1
+        elif n == 1:
+            return x
+        elif n == 2:
+            return 0.5*(3*x**2 - 1)
+        elif n == 3:
+            return 0.5*(5*x**3 - 3*x)
+        elif n == 4:
+            return 0.125*(35*x**4 - 30*x**2 + 3)
+        elif n == 5:
+            return 0.125*(63*x**5 - 70*x**3 + 15*x)
+        elif n == 6:
+            return 0.0625*(231*x**6 - 315*x**4 + 105*x**2 - 5)
 
     def polyfit(self, x, y, yerr, n=2, basis="polynomial"):
         """
@@ -283,6 +325,8 @@ class Statistics:
             base = self.polynomial
         elif basis == "chebyshev":
             base = self.chebyshev
+        elif basis == "legendre":
+            base = self.legendre
 
         A = np.zeros((n+1, n+1))
         a = np.zeros(n+1)
@@ -432,6 +476,41 @@ class DiffEq:
 
         return self.y
 
+class PartDiffEq:
+    def __init__(self, dt, dx, k, u):
+        self.alp = k*dt/(dx)**2
+        self.u = u
+
+    def implicit_back(self):
+        u = self.u
+        for i in range(1, np.shape(u)[0]-1):
+            for j in range(np.shape(u)[1]-1, 0, -1):
+                u[i, j-1] = -self.alp * (u[i+1, j] + u[i-1, j]) + (1 + 2*self.alp)*u[i, j]
+        return u
+
+    def implicit(self):
+        u = self.u
+        A = np.zeros((np.shape(u)[0], np.shape(u)[0]))
+        for i in range(np.shape(A)[0]):
+            for j in range(np.shape(A)[1]):
+                A[i,j] = -self.alp*((i+1)==j + (i-1)==j) + (1+2*self.alp)*(i==j)
+        A[0, 0] = A[-1, -1] = 1
+        m = MatInv()
+        invA = m.inverse(A, m.gauss_siedel)
+
+        for j in range(1, np.shape(u)[1]):
+            print(u[:, j-1])
+            u[:, j] = np.dot(invA, u[:, j-1])
+        return u
+
+    def explicit(self):
+        u = self.u
+        for j in range(np.shape(u)[1]-1):
+            for i in range(1, np.shape(u)[0]-1):
+                u[i, j+1] = self.alp*(u[i+1, j] + u[i-1, j]) + (1 - 2*self.alp)*u[i, j]
+        return u
+
+          
 class Random:
     def __init__(self):
         import time
@@ -447,3 +526,76 @@ class Random:
         u2 = (np.sqrt(-2*np.log(u[1])))*np.sin(2*np.pi*u[1])
         u = u2
         return sigma*u + center
+
+    def walk(self, start):
+        vec = np.zeros_like(start)
+        vals = [-1, 1]
+        num = self.mlcg()//(1/(2*np.shape(start)[0]))
+        vec[int(num//2)] = vals[int(num%2)]
+        return vec
+
+class Integrate:
+    def __init__(self, func):
+        self.function = func
+    
+    def weights(self, numweights):
+        if numweights == 1:
+            return [[0, 2]]
+        elif numweights == 2:
+            return [[1/np.sqrt(3), 1], [-1/np.sqrt(3), -1]]
+        elif numweights == 3:
+            return [[0, 8/9], [np.sqrt(3/5), 5/9], [-np.sqrt(3/5), 5/9]]
+        elif numweights == 4:
+            return [[0.339981043, 0.652145154], [-0.339981043, 0.652145154], [0.861136311, 0.347854845], [-0.861136311, 0.347854845]] 
+        elif numweights == 5:
+            return [[0, 0.568888889], [0.53846931, 0.478628670], [-0.53846931, 0.478628670], [0.906179845, 0.236926885], [0.906179845, 0.236926885]] 
+        elif numweights == 6:
+            return [[0.932469514, 0.171324492], [0.661209386, 0.360761573], [0.238619186, 0.467913934], [-0.932469514, 0.171324492], [-0.661209386, 0.360761573], [-0.238619186, 0.467913934]]
+    
+    def gaussian_quadrature(self, lims: tuple, numweights):
+        a, b = lims
+        weights = np.array(self.weights(numweights))
+        x = np.squeeze(weights[:, 0])
+        w = np.squeeze(weights[:, 1])
+        vals = np.array(list(map(self.function, 0.5*(b-a)*x+0.5*(a+b))))
+        return 0.5*(b-a)*np.sum(np.dot(w, vals))
+
+    def monte_carlo(self, lims: tuple, iter, importance=None):
+        a, b = lims
+        integ = np.array([])
+        r = Random()
+        for i in range(iter):
+            random = r.mlcg()*(np.abs(b-a)) + np.min(lims)
+            integ = np.append(integ, random)
+        if importance:
+            integ = np.abs(b-a)*(np.array(list(map(self.function, integ))))/(np.array(list(map(importance, integ))))
+        else:
+            integ = np.abs(b-a)*(np.array(list(map(self.function, integ))))
+        return np.average(integ)
+
+# class BVP:
+#     def __init__(self, function, t, boundaries, paramlist, tol=1e-4):
+#         self.func = function
+#         self.h = t[1] - t[0]
+#         self.t = t
+#         self.params = paramlist
+#         self.bounds = np.array(boundaries)
+#         self.tol = tol
+
+#     def shooting(self):
+#         x1 = self.bounds[0,0]
+#         y1 = self.bounds[0,1]
+#         x2 = self.bounds[1,0]
+#         y2 = self.bounds[1,1]
+#         diff = 100
+#         guess_energy = (y2-y1)/(x2-x1)
+
+#         d = DiffEq(function, self.t, [0.0, 0.0], self.params)
+#         while diff > self.tol:
+#             d.y = np.reshape(np.array([y1, guess_slope]), (1, d.l))
+#             y = d.runge_kutta()
+#             y_gen1 = y[-1, 0]
+#             d.y = np.reshape(np.array([y1, guess_slope]), (1, d.l))
+#             y = d.runge_kutta()
+#             y_gen2 = y[-1, 0]
+#         return None
